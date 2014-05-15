@@ -1,7 +1,10 @@
 <?php
-echo __FILE__;
+echo __FILE__."\n";
+
+
 class BenchMark
 {
+	var $base_cpu = 6;
 	var $parameter = array();
 	var $cmds = array();
 	var $cmds_paras = array();
@@ -29,6 +32,7 @@ class BenchMark
 		{
 			$cmd_idx = $cmd_para["cmd_idx"];
 			$start_time =  microtime(true);
+			echo $this->cmds[$cmd_idx]."\n";
 			shell_exec($this->cmds[$cmd_idx]);
 			$end_time =  microtime(true);
 			$log = number_format(($end_time - $start_time), 3, '.', '') . "\t" . json_encode($cmd_para) . "\n";
@@ -43,22 +47,29 @@ class BenchMark
 		foreach($this->cmds_paras as $cmd_para)
 		{
 			$cmd_idx = $cmd_para["cmd_idx"];
+			$tmp_dir = dirname(__FILE__)."/{$this->sge_path}/" . md5($this->cmds[$cmd_idx]);
+			@mkdir($tmp_dir);
+			
 			$sge_cmd = $this->default_sge_cmd;
 			if(isset($cmd_para["cpu"]))
-				$sge_cmd .= "#$ -pe single " . ($cmd_para["cpu"]+2) . "\n";
+				$sge_cmd .= "#$ -pe single " . ($cmd_para["cpu"]+$this->base_cpu) . "\n";
 			else if(isset($cmd_para["cpus"]))
-				$sge_cmd .= "#$ -pe single " . ($cmd_para["cpus"]+2) . "\n";
+				$sge_cmd .= "#$ -pe single " . ($cmd_para["cpus"]+$this->base_cpu) . "\n";
 			else
-				$sge_cmd .= "#$ -pe single 2\n";
-			$sge_cmd .= "#$ -o {$this->sge_path}/". md5($this->cmds[$cmd_idx]) .".log  -j y";
+				$sge_cmd .= "#$ -pe single {$this->base_cpu}\n";
+			$sge_cmd .= "#$ -o ".dirname(__FILE__)."/{$this->sge_path}/sge_". md5($this->cmds[$cmd_idx]) .".log  -j y\n";
 			$sge_cmd .= "#Parameter\t" . json_encode($cmd_para) . "\n";
 			$sge_cmd .= "#cmd\t" . $this->cmds[$cmd_idx]."\n";
 			
 			$sge_cmd .= "date\n";
+			$sge_cmd .= "cd $tmp_dir\n";
 			$sge_cmd .= $this->cmds[$cmd_idx]."\n";
 			$sge_cmd .= "date\n";
 			
-			file_put_contents($this->sge_path."/".md5($this->cmds[$cmd_idx]).".sge" , $sge_cmd);
+			file_put_contents($this->sge_path."/sge_".md5($this->cmds[$cmd_idx]).".sge" , $sge_cmd);
+			echo $this->cmds[$cmd_idx]."\n";
+			echo shell_exec("qsub ".$this->sge_path."/sge_".md5($this->cmds[$cmd_idx]).".sge");
+			echo "\n";
 		}
 	}
 	function make_cmds($cmd)
@@ -98,16 +109,39 @@ class BenchMark
 		}
 		sort($this->cmds_paras);
 	}
-
 };
 
+// example usage
+
+$p_sbwt = "/home/andy/publish/sBWT/bin/sbwt_linux";
+$p_genome = "/home/andy/andy/pokemon_0505/sbwt_test3/genome_hg19";
+$p_reads = "/home/andy/andy/pokemon_0505/sbwt_test3/reads_hg19";
+$p_index = "/home/andy/andy/pokemon_0505/sbwt_test3/sbwt/index";
+$p_log = "/home/andy/andy/pokemon_0505/sbwt_test3/sbwt/log";
+
+
+$bb = new BenchMark();
+$bb->base_cpu = 6;
+$bb->add_parameter("repeat", array(1) );
+$bb->add_parameter("genome", array(1,2,4,8,16) );
+$bb->add_parameter("interval", array(32,64) );
+$cmd = "time $p_sbwt build -p $p_index/hg19_\$genomeX_test_400M_\$interval_\$repeat -i $p_genome/hg19_\$genomeX_test_400M.fa -s \$interval -f > ";
+$cmd .= "$p_log/log_build_r_\$repeat_g_\$genome_i_\$interval.log 2>&1";
+$bb->sge_run($cmd);
+exit();
 
 
 $bm = new BenchMark();
-//$bm->add_parameter("repeat", array(1,2,3) );
+$bm->base_cpu = 4;
+$bm->add_parameter("repeat", array(1,2,3,4,5) );
 $bm->add_parameter("genome", array(1,2,4,8,16) );
+$bm->add_parameter("len", array(20,40,60,80,100) );
+$bm->add_parameter("cpu", array(1,2,4,8,16) );
+$bb->add_parameter("interval", array(64) );
 
-$bm->sge_run("time sleep \$genome");
+$cmd = "time $p_sbwt map -p $p_index/hg19_\$genomeX_test_400M_\$interval -i $p_reads/s_hg19_400M_reads_\$len.fq -n \$cpu -o result_\$genome_\$len.sam > ";
+$cmd .= "$p_log/log_search_r_\$repeat_g_\$genome_l_\$len_c_\$cpu_\$interval.log 2>&1";
+$bm->sge_run($cmd);
 
 
 ?>
