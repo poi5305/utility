@@ -71,20 +71,26 @@ class BenchMark
 		for($i=0;$i<$total_cmd;$i++)
 			$this->cmds[] = $cmd;
 		
-		foreach($this->parameter as $name => $values)
+		$para_idx = 1;
+		foreach($this->parameter as $name => $values) //3
 		{
 			$cmds_idx = 0;
 			$values_count = count($values);
-			for($i=0;$i < ($total_cmd / $values_count) ;$i++)
+			for($r_idx=0; $r_idx < $para_idx; $r_idx++) //1 2 3
 			{
-				foreach($values as $value)
-				{
-					$this->cmds[$cmds_idx] = str_replace("\$$name", $value, $this->cmds[$cmds_idx]);
-					$this->cmds_paras[$cmds_idx][$name] = $value;
-					//$this->cmds_paras[$cmds_idx]["cmds_idx"] = $cmds_idx;
-					$cmds_idx++;
+				foreach($values as $value) //2 2 1
+				{		
+					for($i=0;$i < floor($total_cmd / $values_count / $para_idx) ;$i++)
+					{
+						
+						$this->cmds[$cmds_idx] = str_replace("\$$name", $value, $this->cmds[$cmds_idx]);
+						$this->cmds_paras[$cmds_idx][$name] = $value;
+						//$this->cmds_paras[$cmds_idx]["cmds_idx"] = $cmds_idx;
+						$cmds_idx++;
+					}
 				}
 			}
+			$para_idx *= $values_count;
 		}
 		foreach($this->cmds_paras as $idx => &$value)
 		{
@@ -92,6 +98,7 @@ class BenchMark
 		}
 		sort($this->cmds_paras);
 	}
+
 };
 
 
